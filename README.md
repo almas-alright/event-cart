@@ -277,6 +277,9 @@ EventCart includes:
 
 ## Deeper Docs
 
+- [Curl examples](docs/examples/README.md)
+- [Architecture diagrams](docs/diagrams/)
+- [Architecture decisions](docs/architecture-decisions.md)
 - [Architecture overview](docs/architecture/overview.md)
 - [Order lifecycle](docs/domain/order-lifecycle.md)
 - [Transactional outbox](docs/architecture/transactional-outbox.md)
@@ -286,6 +289,7 @@ EventCart includes:
 - [Broker vs brokerless](docs/architecture/broker-vs-brokerless.md)
 - [Retry, dead letter, and replay](docs/architecture/retry-dead-letter-replay.md)
 - [Observability](docs/architecture/observability.md)
+- [Testing guide](docs/testing-guide.md)
 
 ## Testing Guide
 
