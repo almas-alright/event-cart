@@ -8,14 +8,28 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from eventcart.modules.events import EventEnvelope, OutboxEvent
+from eventcart.modules.idempotency import ConsumerInbox
 from eventcart.modules.inventory import InventoryItem
+
+INVENTORY_CONSUMER_NAME = "inventory-worker"
 
 
 class InventoryReservationError(Exception):
     pass
 
 
-def handle_order_created(session: Session, event: EventEnvelope) -> OutboxEvent:
+def handle_order_created(session: Session, event: EventEnvelope) -> OutboxEvent | None:
+    inbox = ConsumerInbox(session, consumer_name=INVENTORY_CONSUMER_NAME)
+    outbox_event = inbox.process_once(
+        event,
+        lambda handled_event: _reserve_inventory(session, handled_event),
+    )
+    if outbox_event is not None:
+        session.commit()
+    return outbox_event
+
+
+def _reserve_inventory(session: Session, event: EventEnvelope) -> OutboxEvent:
     order_id = str(event.payload["order_id"])
     requested_items = _payload_items(event.payload)
 
@@ -34,7 +48,6 @@ def handle_order_created(session: Session, event: EventEnvelope) -> OutboxEvent:
             },
         )
         session.add(outbox_event)
-        session.commit()
         return outbox_event
 
     for requested_item in requested_items:
@@ -52,7 +65,6 @@ def handle_order_created(session: Session, event: EventEnvelope) -> OutboxEvent:
         },
     )
     session.add(outbox_event)
-    session.commit()
     return outbox_event
 
 
