@@ -34,3 +34,15 @@ class IdempotencyKey(Base):
         onupdate=lambda: datetime.now(UTC),
         nullable=False,
     )
+
+
+class InboxEvent(Base):
+    __tablename__ = "inbox_events"
+
+    consumer_name: Mapped[str] = mapped_column(String(100), primary_key=True)
+    event_id: Mapped[str] = mapped_column(String(36), primary_key=True, index=True)
+    processed_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(UTC),
+        nullable=False,
+    )
