@@ -68,6 +68,27 @@ def dispatch_pending_batch(
     return len(events)
 
 
+def dispatch_until_idle(
+    session: Session,
+    *,
+    handlers: Mapping[str, EventHandler] | None = None,
+    limit: int = 50,
+    max_batches: int = 100,
+) -> int:
+    dispatched_total = 0
+    for _ in range(max_batches):
+        dispatched_count = dispatch_pending_batch(
+            session,
+            handlers=handlers,
+            limit=limit,
+        )
+        dispatched_total += dispatched_count
+        if dispatched_count == 0:
+            return dispatched_total
+
+    raise RuntimeError("Brokerless dispatcher did not become idle.")
+
+
 def run_once(limit: int = 50) -> int:
     with SessionLocal() as session:
         return dispatch_pending_batch(session, limit=limit)
