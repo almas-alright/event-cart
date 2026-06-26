@@ -11,6 +11,7 @@ from eventcart.config import get_settings
 from eventcart.modules.inventory.routes import router as inventory_router
 from eventcart.modules.orders.routes import router as orders_router
 from eventcart.shared.logging import configure_logging, set_correlation_id
+from eventcart.shared.metrics import record_http_request, render_metrics
 from eventcart.shared.tracing import setup_tracing
 
 
@@ -39,9 +40,28 @@ def create_app() -> FastAPI:
         set_correlation_id(None)
         return response
 
+    @app.middleware("http")
+    async def metrics_middleware(
+        request: Request,
+        call_next: RequestResponseEndpoint,
+    ) -> Response:
+        response = await call_next(request)
+        if request.url.path != "/metrics":
+            record_http_request(
+                method=request.method,
+                path=request.url.path,
+                status_code=response.status_code,
+            )
+        return response
+
     @app.get("/health", tags=["system"])
     def health() -> dict[str, str]:
         return {"status": "healthy", "service": "eventcart"}
+
+    @app.get("/metrics", tags=["system"], include_in_schema=False)
+    def metrics() -> Response:
+        body, media_type = render_metrics()
+        return Response(content=body, media_type=media_type)
 
     app.include_router(inventory_router)
     app.include_router(orders_router)
