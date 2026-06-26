@@ -134,8 +134,11 @@ class DeadLetterEventRepository:
         dead_letter_event = DeadLetterEvent(
             event_id=event.event_id,
             event_type=event.event_type,
+            event_version=event.event_version,
             aggregate_type=event.aggregate_type,
             aggregate_id=event.aggregate_id,
+            correlation_id=event.correlation_id,
+            causation_id=event.causation_id,
             consumer_name=consumer_name,
             attempt_number=attempt_number,
             error=error[:500],
@@ -144,3 +147,26 @@ class DeadLetterEventRepository:
         self.session.add(dead_letter_event)
         self.session.flush()
         return dead_letter_event
+
+    def replay(self, dead_letter_id: str) -> OutboxEvent:
+        dead_letter_event = self.session.get(DeadLetterEvent, dead_letter_id)
+        if dead_letter_event is None:
+            raise LookupError(f"Dead-letter event {dead_letter_id!r} was not found.")
+        if dead_letter_event.replayed_at is not None:
+            raise ValueError(
+                f"Dead-letter event {dead_letter_id!r} was already replayed."
+            )
+
+        replay_event = OutboxEvent(
+            event_type=dead_letter_event.event_type,
+            event_version=dead_letter_event.event_version,
+            aggregate_type=dead_letter_event.aggregate_type,
+            aggregate_id=dead_letter_event.aggregate_id,
+            correlation_id=dead_letter_event.correlation_id,
+            causation_id=dead_letter_event.causation_id,
+            payload=dead_letter_event.payload,
+        )
+        self.session.add(replay_event)
+        dead_letter_event.replayed_at = datetime.now(UTC)
+        self.session.flush()
+        return replay_event
