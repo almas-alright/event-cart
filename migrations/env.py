@@ -11,6 +11,7 @@ from sqlalchemy import engine_from_config, pool
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 import eventcart.modules.events.models  # noqa: F401
+import eventcart.modules.idempotency.models  # noqa: F401
 import eventcart.modules.inventory.models  # noqa: F401
 import eventcart.modules.orders.models  # noqa: F401
 from eventcart.database import Base
