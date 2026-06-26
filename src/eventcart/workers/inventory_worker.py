@@ -7,11 +7,12 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from eventcart.modules.events import EventEnvelope, OutboxEvent
+from eventcart.modules.events import EventEnvelope, OutboxEvent, notify_outbox_event
 from eventcart.modules.idempotency import ConsumerInbox
 from eventcart.modules.inventory import InventoryItem
 
 INVENTORY_CONSUMER_NAME = "inventory-worker"
+INVENTORY_COMPENSATION_CONSUMER_NAME = "inventory-compensation-worker"
 
 
 class InventoryReservationError(Exception):
@@ -23,6 +24,20 @@ def handle_order_created(session: Session, event: EventEnvelope) -> OutboxEvent 
     outbox_event = inbox.process_once(
         event,
         lambda handled_event: _reserve_inventory(session, handled_event),
+    )
+    if outbox_event is not None:
+        session.commit()
+    return outbox_event
+
+
+def handle_payment_failed(session: Session, event: EventEnvelope) -> OutboxEvent | None:
+    inbox = ConsumerInbox(
+        session,
+        consumer_name=INVENTORY_COMPENSATION_CONSUMER_NAME,
+    )
+    outbox_event = inbox.process_once(
+        event,
+        lambda handled_event: _release_inventory(session, handled_event),
     )
     if outbox_event is not None:
         session.commit()
@@ -48,6 +63,7 @@ def _reserve_inventory(session: Session, event: EventEnvelope) -> OutboxEvent:
             },
         )
         session.add(outbox_event)
+        notify_outbox_event(session, outbox_event)
         return outbox_event
 
     for requested_item in requested_items:
@@ -65,6 +81,33 @@ def _reserve_inventory(session: Session, event: EventEnvelope) -> OutboxEvent:
         },
     )
     session.add(outbox_event)
+    notify_outbox_event(session, outbox_event)
+    return outbox_event
+
+
+def _release_inventory(session: Session, event: EventEnvelope) -> OutboxEvent:
+    order_id = str(event.payload["order_id"])
+    released_items = _payload_items(event.payload)
+    inventory_items = _load_inventory_items(session, released_items)
+
+    for released_item in released_items:
+        sku = str(released_item["sku"])
+        quantity = _quantity(released_item)
+        inventory_items[sku].quantity_available += quantity
+
+    outbox_event = _build_result_event(
+        source_event=event,
+        event_type="InventoryReleased",
+        order_id=order_id,
+        payload={
+            "order_id": order_id,
+            "payment_id": event.payload.get("payment_id"),
+            "reason": event.payload.get("reason"),
+            "items": released_items,
+        },
+    )
+    session.add(outbox_event)
+    notify_outbox_event(session, outbox_event)
     return outbox_event
 
 

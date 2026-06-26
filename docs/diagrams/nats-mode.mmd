@@ -1,0 +1,16 @@
+flowchart LR
+    Outbox[("outbox_events")]
+    Publisher["outbox publisher"]
+    NATS["NATS JetStream"]
+    Durable["durable consumers"]
+    Workers["workers"]
+    Inbox[("inbox_events")]
+    State[("business tables")]
+
+    Outbox --> Publisher
+    Publisher --> NATS
+    NATS --> Durable
+    Durable --> Workers
+    Workers --> Inbox
+    Workers --> State
+    Workers --> Outbox

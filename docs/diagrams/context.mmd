@@ -1,0 +1,13 @@
+flowchart LR
+    Developer["Developer / learner"]
+    Client["HTTP client"]
+    EventCart["EventCart API and workers"]
+    Database[("PostgreSQL")]
+    Broker["NATS JetStream"]
+    Observability["Prometheus / Grafana / Jaeger"]
+
+    Developer --> Client
+    Client --> EventCart
+    EventCart --> Database
+    EventCart --> Broker
+    EventCart --> Observability

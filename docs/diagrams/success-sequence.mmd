@@ -1,0 +1,14 @@
+sequenceDiagram
+    participant API
+    participant Inventory
+    participant Payment
+    participant Invoice
+    participant Notification
+    participant Projection
+
+    API->>Inventory: OrderCreated
+    Inventory->>Payment: InventoryReserved
+    Payment->>Invoice: PaymentAuthorized
+    Invoice->>Notification: InvoiceCreated
+    Notification->>Projection: NotificationSent
+    Projection->>Projection: order COMPLETED
