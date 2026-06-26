@@ -11,16 +11,19 @@ from eventcart.config import get_settings
 from eventcart.modules.inventory.routes import router as inventory_router
 from eventcart.modules.orders.routes import router as orders_router
 from eventcart.shared.logging import configure_logging, set_correlation_id
+from eventcart.shared.tracing import setup_tracing
 
 
 def create_app() -> FastAPI:
     """Create and configure the EventCart API application."""
-    configure_logging(level=get_settings().log_level)
+    settings = get_settings()
+    configure_logging(level=settings.log_level)
     app = FastAPI(
         title="EventCart",
         version=__version__,
         summary="A learning backend for event-driven order workflows.",
     )
+    setup_tracing(app, settings)
 
     @app.middleware("http")
     async def correlation_middleware(

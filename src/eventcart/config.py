@@ -19,6 +19,8 @@ class Settings:
     redis_url: str = "redis://redis:6379/0"
     nats_url: str = "nats://nats:4222"
     event_transport: EventTransport = EventTransport.NATS
+    service_name: str = "eventcart-api"
+    otel_exporter_otlp_endpoint: str | None = None
 
 
 @lru_cache
@@ -33,4 +35,6 @@ def get_settings() -> Settings:
         redis_url=getenv("REDIS_URL", Settings.redis_url),
         nats_url=getenv("NATS_URL", Settings.nats_url),
         event_transport=event_transport,
+        service_name=getenv("EVENTCART_SERVICE_NAME", Settings.service_name),
+        otel_exporter_otlp_endpoint=getenv("OTEL_EXPORTER_OTLP_ENDPOINT"),
     )
