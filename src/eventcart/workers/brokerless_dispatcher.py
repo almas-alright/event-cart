@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
@@ -15,6 +16,7 @@ from eventcart.modules.events import (
     EventProcessingAttemptRepository,
     OutboxRepository,
 )
+from eventcart.shared.logging import set_correlation_id
 from eventcart.workers.inventory_worker import (
     handle_order_created,
     handle_payment_failed,
@@ -29,6 +31,7 @@ from eventcart.workers.outbox_publisher import envelope_from_outbox_event
 from eventcart.workers.payment_worker import handle_inventory_reserved
 
 EventHandler = Callable[[Session, EventEnvelope], object]
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -105,7 +108,17 @@ def dispatch_pending_batch(
                     f"No brokerless handler registered for {event.event_type!r}."
                 )
 
-            registration.handler(session, envelope_from_outbox_event(event))
+            envelope = envelope_from_outbox_event(event)
+            set_correlation_id(envelope.correlation_id)
+            logger.info(
+                "dispatching brokerless event",
+                extra={
+                    "event_id": envelope.event_id,
+                    "event_type": envelope.event_type,
+                    "consumer_name": registration.consumer_name,
+                },
+            )
+            registration.handler(session, envelope)
             repository.mark_published(event.event_id)
         except Exception as error:
             consumer_name = _consumer_name_for_failure(
@@ -134,6 +147,7 @@ def dispatch_pending_batch(
                 )
 
         session.commit()
+        set_correlation_id(None)
 
     return len(events)
 
