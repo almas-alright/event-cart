@@ -2,8 +2,16 @@ from sqlalchemy import create_engine, select
 from sqlalchemy.orm import Session
 
 from eventcart.database import Base
-from eventcart.modules.events import EventEnvelope, OutboxEvent, OutboxEventStatus
-from eventcart.workers.brokerless_dispatcher import dispatch_pending_batch
+from eventcart.modules.events import (
+    EventEnvelope,
+    EventProcessingAttempt,
+    OutboxEvent,
+    OutboxEventStatus,
+)
+from eventcart.workers.brokerless_dispatcher import (
+    EventHandlerRegistration,
+    dispatch_pending_batch,
+)
 
 
 def test_brokerless_dispatcher_routes_pending_event_and_marks_published() -> None:
@@ -27,8 +35,11 @@ def test_brokerless_dispatcher_routes_pending_event_and_marks_published() -> Non
         dispatched_count = dispatch_pending_batch(
             session,
             handlers={
-                "OrderCreated": lambda _session, envelope: handled_events.append(
-                    envelope
+                "OrderCreated": EventHandlerRegistration(
+                    consumer_name="inventory-worker",
+                    handler=lambda _session, envelope: handled_events.append(
+                        envelope
+                    ),
                 )
             },
         )
@@ -43,7 +54,7 @@ def test_brokerless_dispatcher_routes_pending_event_and_marks_published() -> Non
     assert saved_event.last_error is None
 
 
-def test_brokerless_dispatcher_marks_unsupported_event_failed() -> None:
+def test_brokerless_dispatcher_schedules_retry_for_unsupported_event() -> None:
     engine = create_engine("sqlite+pysqlite:///:memory:")
     Base.metadata.create_all(engine)
 
@@ -63,8 +74,12 @@ def test_brokerless_dispatcher_marks_unsupported_event_failed() -> None:
         dispatched_count = dispatch_pending_batch(session, handlers={})
 
         saved_event = session.scalars(select(OutboxEvent)).one()
+        attempt = session.scalars(select(EventProcessingAttempt)).one()
 
     assert dispatched_count == 1
-    assert saved_event.status == OutboxEventStatus.FAILED
+    assert saved_event.status == OutboxEventStatus.PENDING
     assert saved_event.failure_count == 1
+    assert saved_event.next_attempt_at is not None
     assert "No brokerless handler registered" in str(saved_event.last_error)
+    assert attempt.consumer_name == "brokerless-dispatcher"
+    assert attempt.attempt_number == 1
