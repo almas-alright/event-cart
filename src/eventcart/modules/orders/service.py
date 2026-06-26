@@ -5,7 +5,7 @@ from uuid import uuid4
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
-from eventcart.modules.events.models import OutboxEvent
+from eventcart.modules.events import OutboxEvent, notify_outbox_event
 from eventcart.modules.inventory.models import InventoryItem
 from eventcart.modules.orders.models import Order, OrderItem
 from eventcart.modules.orders.schemas import OrderCreate
@@ -49,22 +49,22 @@ def create_order(session: Session, payload: OrderCreate) -> Order:
     session.add(order)
     session.flush()
 
-    session.add(
-        OutboxEvent(
-            event_type="OrderCreated",
-            event_version=1,
-            aggregate_type="Order",
-            aggregate_id=order.id,
-            correlation_id=str(uuid4()),
-            causation_id=None,
-            payload={
-                "order_id": order.id,
-                "customer_email": order.customer_email,
-                "status": order.status,
-                "items": event_items,
-            },
-        )
+    outbox_event = OutboxEvent(
+        event_type="OrderCreated",
+        event_version=1,
+        aggregate_type="Order",
+        aggregate_id=order.id,
+        correlation_id=str(uuid4()),
+        causation_id=None,
+        payload={
+            "order_id": order.id,
+            "customer_email": order.customer_email,
+            "status": order.status,
+            "items": event_items,
+        },
     )
+    session.add(outbox_event)
+    notify_outbox_event(session, outbox_event)
     session.commit()
 
     saved_order = get_order(session, order.id)

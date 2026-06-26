@@ -6,7 +6,7 @@ from typing import Any
 
 from sqlalchemy.orm import Session
 
-from eventcart.modules.events import EventEnvelope, OutboxEvent
+from eventcart.modules.events import EventEnvelope, OutboxEvent, notify_outbox_event
 from eventcart.modules.idempotency import ConsumerInbox
 from eventcart.modules.invoices import Invoice, InvoiceStatus
 
@@ -53,6 +53,7 @@ def _create_invoice(session: Session, event: EventEnvelope) -> OutboxEvent:
         },
     )
     session.add(outbox_event)
+    notify_outbox_event(session, outbox_event)
     return outbox_event
 
 
