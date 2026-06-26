@@ -33,9 +33,11 @@ pythonpath = ["src"]
 line-length = 88
 target-version = "py312"
 
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+
 [tool.pyright]
 pythonVersion = "3.12"
 venvPath = "."
 venv = ".venv"
 include = ["src", "tests"]
-

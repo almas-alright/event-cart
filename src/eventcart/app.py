@@ -1,7 +1,8 @@
 """FastAPI application factory for EventCart."""
 
-from eventcart import __version__
 from fastapi import FastAPI
+
+from eventcart import __version__
 
 
 def create_app() -> FastAPI:

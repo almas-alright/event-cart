@@ -16,5 +16,15 @@ The API health endpoint is available at:
 GET http://localhost:8000/health
 ```
 
-The final README will be expanded in the documentation phase.
+## Local Checks
 
+Install development dependencies, then run the baseline checks:
+
+```bash
+python -m pip install -e ".[dev]"
+ruff check .
+pyright
+pytest
+```
+
+The final README will be expanded in the documentation phase.
