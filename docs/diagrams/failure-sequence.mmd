@@ -1,0 +1,11 @@
+sequenceDiagram
+    participant API
+    participant Inventory
+    participant Payment
+    participant Projection
+
+    API->>Inventory: OrderCreated
+    Inventory->>Payment: InventoryReserved
+    Payment->>Inventory: PaymentFailed
+    Inventory->>Projection: InventoryReleased
+    Projection->>Projection: order CANCELLED

@@ -1,0 +1,15 @@
+flowchart LR
+    Outbox[("outbox_events")]
+    Notify["LISTEN/NOTIFY wake-up"]
+    Poller["polling dispatcher"]
+    Router["event type router"]
+    Handler["local handler"]
+    State[("business tables")]
+
+    Outbox --> Poller
+    Outbox -.-> Notify
+    Notify -.-> Poller
+    Poller --> Router
+    Router --> Handler
+    Handler --> State
+    Handler --> Outbox

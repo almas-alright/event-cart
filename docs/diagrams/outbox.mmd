@@ -1,0 +1,16 @@
+flowchart LR
+    Request["POST /api/v1/orders"]
+    Transaction["database transaction"]
+    OrderRows["orders and order_items"]
+    OutboxRow["outbox_events: OrderCreated"]
+    Commit["commit"]
+    Delivery["publisher or brokerless dispatcher"]
+    Worker["worker handler"]
+
+    Request --> Transaction
+    Transaction --> OrderRows
+    Transaction --> OutboxRow
+    OrderRows --> Commit
+    OutboxRow --> Commit
+    Commit --> Delivery
+    Delivery --> Worker
