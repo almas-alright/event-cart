@@ -2,7 +2,7 @@
 
 from datetime import UTC, datetime
 
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
 from eventcart.modules.events.models import (
@@ -16,11 +16,23 @@ class OutboxRepository:
     def __init__(self, session: Session) -> None:
         self.session = session
 
-    def fetch_pending(self, limit: int) -> list[OutboxEvent]:
+    def fetch_pending(
+        self,
+        limit: int,
+        *,
+        now: datetime | None = None,
+    ) -> list[OutboxEvent]:
+        ready_at = now or datetime.now(UTC)
         return list(
             self.session.scalars(
                 select(OutboxEvent)
-                .where(OutboxEvent.status == OutboxEventStatus.PENDING)
+                .where(
+                    OutboxEvent.status == OutboxEventStatus.PENDING,
+                    or_(
+                        OutboxEvent.next_attempt_at.is_(None),
+                        OutboxEvent.next_attempt_at <= ready_at,
+                    ),
+                )
                 .order_by(OutboxEvent.occurred_at, OutboxEvent.event_id)
                 .limit(limit)
             )
@@ -30,12 +42,27 @@ class OutboxRepository:
         event = self._get_event(event_id)
         event.status = OutboxEventStatus.PUBLISHED
         event.published_at = datetime.now(UTC)
+        event.next_attempt_at = None
         event.last_error = None
+
+    def mark_retryable_failure(
+        self,
+        event_id: str,
+        *,
+        error: str,
+        next_attempt_at: datetime,
+    ) -> None:
+        event = self._get_event(event_id)
+        event.status = OutboxEventStatus.PENDING
+        event.failure_count += 1
+        event.next_attempt_at = next_attempt_at
+        event.last_error = error[:500]
 
     def mark_failed(self, event_id: str, error: str) -> None:
         event = self._get_event(event_id)
         event.status = OutboxEventStatus.FAILED
         event.failure_count += 1
+        event.next_attempt_at = None
         event.last_error = error[:500]
 
     def _get_event(self, event_id: str) -> OutboxEvent:
