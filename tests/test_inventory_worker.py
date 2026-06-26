@@ -28,6 +28,7 @@ def test_inventory_worker_reserves_stock_and_emits_reserved_event() -> None:
             session,
             make_order_created_event(quantity=3),
         )
+        assert outbox_event is not None
 
         saved_inventory = session.scalars(select(InventoryItem)).one()
         saved_outbox_event = session.get_one(OutboxEvent, outbox_event.event_id)
@@ -59,6 +60,7 @@ def test_inventory_worker_emits_failed_event_when_stock_is_insufficient() -> Non
             session,
             make_order_created_event(quantity=3),
         )
+        assert outbox_event is not None
 
         saved_inventory = session.scalars(select(InventoryItem)).one()
         saved_outbox_event = session.get_one(OutboxEvent, outbox_event.event_id)
@@ -67,6 +69,35 @@ def test_inventory_worker_emits_failed_event_when_stock_is_insufficient() -> Non
     assert saved_outbox_event.event_type == "InventoryReservationFailed"
     assert saved_outbox_event.aggregate_id == "order-1"
     assert "Insufficient inventory" in str(saved_outbox_event.payload["reason"])
+
+
+def test_inventory_worker_skips_duplicate_order_created_event() -> None:
+    engine = create_engine("sqlite+pysqlite:///:memory:")
+    Base.metadata.create_all(engine)
+
+    with Session(engine) as session:
+        session.add(
+            InventoryItem(
+                sku="ticket-standard",
+                name="Standard Ticket",
+                quantity_available=10,
+                unit_price_cents=4500,
+            )
+        )
+        session.commit()
+
+        event = make_order_created_event(quantity=3)
+        first_result = handle_order_created(session, event)
+        second_result = handle_order_created(session, event)
+
+        saved_inventory = session.scalars(select(InventoryItem)).one()
+        outbox_events = session.scalars(select(OutboxEvent)).all()
+
+    assert first_result is not None
+    assert second_result is None
+    assert saved_inventory.quantity_available == 7
+    assert len(outbox_events) == 1
+    assert outbox_events[0].event_type == "InventoryReserved"
 
 
 def make_order_created_event(quantity: int) -> EventEnvelope:
