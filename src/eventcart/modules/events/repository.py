@@ -6,6 +6,7 @@ from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
 from eventcart.modules.events.models import (
+    DeadLetterEvent,
     EventProcessingAttempt,
     OutboxEvent,
     OutboxEventStatus,
@@ -116,3 +117,30 @@ class EventProcessingAttemptRepository:
             )
             or 0
         )
+
+
+class DeadLetterEventRepository:
+    def __init__(self, session: Session) -> None:
+        self.session = session
+
+    def move_to_dead_letter(
+        self,
+        *,
+        event: OutboxEvent,
+        consumer_name: str,
+        attempt_number: int,
+        error: str,
+    ) -> DeadLetterEvent:
+        dead_letter_event = DeadLetterEvent(
+            event_id=event.event_id,
+            event_type=event.event_type,
+            aggregate_type=event.aggregate_type,
+            aggregate_id=event.aggregate_id,
+            consumer_name=consumer_name,
+            attempt_number=attempt_number,
+            error=error[:500],
+            payload=event.payload,
+        )
+        self.session.add(dead_letter_event)
+        self.session.flush()
+        return dead_letter_event

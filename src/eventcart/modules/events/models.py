@@ -72,3 +72,27 @@ class EventProcessingAttempt(Base):
         default=lambda: datetime.now(UTC),
         nullable=False,
     )
+
+
+class DeadLetterEvent(Base):
+    __tablename__ = "dead_letter_events"
+
+    id: Mapped[str] = mapped_column(
+        String(36),
+        primary_key=True,
+        default=lambda: str(uuid4()),
+    )
+    event_id: Mapped[str] = mapped_column(String(36), nullable=False, index=True)
+    event_type: Mapped[str] = mapped_column(String(100), nullable=False)
+    aggregate_type: Mapped[str] = mapped_column(String(100), nullable=False)
+    aggregate_id: Mapped[str] = mapped_column(String(36), nullable=False)
+    consumer_name: Mapped[str] = mapped_column(String(100), nullable=False, index=True)
+    attempt_number: Mapped[int] = mapped_column(Integer, nullable=False)
+    error: Mapped[str] = mapped_column(String(500), nullable=False)
+    payload: Mapped[dict[str, object]] = mapped_column(JSON, nullable=False)
+    failed_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(UTC),
+        nullable=False,
+    )
+    replayed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

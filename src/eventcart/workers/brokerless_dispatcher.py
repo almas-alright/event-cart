@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 
 from eventcart.database import SessionLocal
 from eventcart.modules.events import (
+    DeadLetterEventRepository,
     EventEnvelope,
     EventProcessingAttemptRepository,
     OutboxRepository,
@@ -39,6 +40,7 @@ class EventHandlerRegistration:
 @dataclass(frozen=True)
 class RetryPolicy:
     backoff_seconds: int = 5
+    max_attempts: int = 3
 
     def delay_for_attempt(self, attempt_number: int) -> timedelta:
         return timedelta(seconds=self.backoff_seconds * attempt_number)
@@ -91,6 +93,7 @@ def dispatch_pending_batch(
     repository = OutboxRepository(session)
     events = repository.fetch_pending(limit=limit)
     attempt_repository = EventProcessingAttemptRepository(session)
+    dead_letter_repository = DeadLetterEventRepository(session)
     event_handlers = handlers or default_event_handlers()
     policy = retry_policy or RetryPolicy()
 
@@ -114,12 +117,21 @@ def dispatch_pending_batch(
                 consumer_name=consumer_name,
                 error=str(error),
             )
-            repository.mark_retryable_failure(
-                event.event_id,
-                error=str(error),
-                next_attempt_at=datetime.now(UTC)
-                + policy.delay_for_attempt(attempt.attempt_number),
-            )
+            if attempt.attempt_number >= policy.max_attempts:
+                dead_letter_repository.move_to_dead_letter(
+                    event=event,
+                    consumer_name=consumer_name,
+                    attempt_number=attempt.attempt_number,
+                    error=str(error),
+                )
+                repository.mark_failed(event.event_id, str(error))
+            else:
+                repository.mark_retryable_failure(
+                    event.event_id,
+                    error=str(error),
+                    next_attempt_at=datetime.now(UTC)
+                    + policy.delay_for_attempt(attempt.attempt_number),
+                )
 
         session.commit()
 

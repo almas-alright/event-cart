@@ -1,6 +1,7 @@
 """Event and outbox module."""
 
 from eventcart.modules.events.models import (
+    DeadLetterEvent,
     EventProcessingAttempt,
     OutboxEvent,
     OutboxEventStatus,
@@ -12,12 +13,15 @@ from eventcart.modules.events.notify import (
 )
 from eventcart.modules.events.publisher import NatsEventPublisher, subject_for_event
 from eventcart.modules.events.repository import (
+    DeadLetterEventRepository,
     EventProcessingAttemptRepository,
     OutboxRepository,
 )
 from eventcart.modules.events.schemas import EventEnvelope
 
 __all__ = [
+    "DeadLetterEvent",
+    "DeadLetterEventRepository",
     "EventEnvelope",
     "EventProcessingAttempt",
     "EventProcessingAttemptRepository",
