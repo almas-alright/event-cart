@@ -7,7 +7,7 @@ retry handling, and local Docker infrastructure.
 It is not a full e-commerce platform. The goal is to make event-driven backend
 architecture easy to inspect through a compact order-processing example.
 
-## What This Project Teaches
+## Why This Shreded Scope?
 
 EventCart demonstrates:
 
